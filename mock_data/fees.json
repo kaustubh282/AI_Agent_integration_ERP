@@ -1,0 +1,20 @@
+[
+  {
+    "student_id": "STU001",
+    "total_fees": 50000,
+    "paid_fees": 45000,
+    "outstanding_fees": 5000
+  },
+  {
+    "student_id": "STU002",
+    "total_fees": 50000,
+    "paid_fees": 38000,
+    "outstanding_fees": 12000
+  },
+  {
+    "student_id": "STU003",
+    "total_fees": 50000,
+    "paid_fees": 50000,
+    "outstanding_fees": 0
+  }
+]

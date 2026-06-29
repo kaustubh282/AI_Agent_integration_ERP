@@ -1,0 +1,34 @@
+[
+  {
+    "collection_id": "COL001",
+    "date": "2026-06-29",
+    "student_id": "STU001",
+    "class_name": "8A",
+    "amount": 5000,
+    "payment_mode": "UPI"
+  },
+  {
+    "collection_id": "COL002",
+    "date": "2026-06-28",
+    "student_id": "STU002",
+    "class_name": "8A",
+    "amount": 8000,
+    "payment_mode": "Cash"
+  },
+  {
+    "collection_id": "COL003",
+    "date": "2026-06-20",
+    "student_id": "STU003",
+    "class_name": "8B",
+    "amount": 10000,
+    "payment_mode": "Bank Transfer"
+  },
+  {
+    "collection_id": "COL004",
+    "date": "2026-05-15",
+    "student_id": "STU001",
+    "class_name": "8A",
+    "amount": 15000,
+    "payment_mode": "UPI"
+  }
+]

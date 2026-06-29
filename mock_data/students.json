@@ -1,0 +1,41 @@
+[
+  {
+    "student_id": "STU001",
+    "name": "Rahul Sharma",
+    "class_name": "8A",
+    "roll_number": 12,
+    "admission_number": "ADM2024-001",
+    "dob": "2011-05-14",
+    "gender": "Male",
+    "parent_name": "Amit Sharma",
+    "contact_number": "9876543210",
+    "address": "Pune, Maharashtra",
+    "admission_date": "2024-06-10"
+  },
+  {
+    "student_id": "STU002",
+    "name": "Priya Patel",
+    "class_name": "8A",
+    "roll_number": 18,
+    "admission_number": "ADM2024-002",
+    "dob": "2011-08-22",
+    "gender": "Female",
+    "parent_name": "Neha Patel",
+    "contact_number": "9876543211",
+    "address": "Pune, Maharashtra",
+    "admission_date": "2024-06-10"
+  },
+  {
+    "student_id": "STU003",
+    "name": "Amit Kumar",
+    "class_name": "8B",
+    "roll_number": 7,
+    "admission_number": "ADM2024-003",
+    "dob": "2011-03-05",
+    "gender": "Male",
+    "parent_name": "Raj Kumar",
+    "contact_number": "9876543212",
+    "address": "Pune, Maharashtra",
+    "admission_date": "2024-06-11"
+  }
+]

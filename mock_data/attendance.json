@@ -1,0 +1,8 @@
+[
+    {
+        "student_id": "STU001",
+        "present_days": 92,
+        "absent_days": 8,
+        "attendance_percentage": 92
+    }
+]

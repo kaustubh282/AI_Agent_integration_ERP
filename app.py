@@ -6,8 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from agents.intent_detector import detect_intent
-from agents.parameter_extractor import extract_parameters
+from agents.llm_parser import parse_user_message
 from agents.response_formatter import format_response
 from agents.tool_router import route_tool
 from core.exceptions import ERPAgentError, ERPAPIError, ERPValidationError
@@ -100,9 +99,12 @@ async def handle_unexpected_error(_: Request, exc: Exception):
 
 
 @app.post("/chat")
-def chat(request: ChatRequest, _: None = Depends(verify_api_key)):
-    intent = detect_intent(request.message)
-    parameters = sanitize_parameters(extract_parameters(request.message))
+def chat(request: ChatRequest):
+    parsed = parse_user_message(request.message)
+
+    intent = parsed["intent"]
+    parameters = sanitize_parameters(parsed["parameters"])
+
     tool_result = route_tool(intent, parameters)
     formatted_response = format_response(tool_result)
 

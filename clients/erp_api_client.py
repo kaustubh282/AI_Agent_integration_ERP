@@ -94,7 +94,10 @@ class ERPAPIClient:
         filtered_records = []
 
         for record in records:
-            if class_name and record.get("class_name", "").lower() != class_name.lower():
+            if (
+                class_name
+                and record.get("class_name", "").lower() != class_name.lower()
+            ):
                 continue
 
             if date_range and not self._matches_date_range(record["date"], date_range):
@@ -142,3 +145,50 @@ class ERPAPIClient:
             return first_day_last_month <= parsed_date <= last_day_last_month
 
         return True
+
+    def get_enquiries(self):
+        return self.load_json("mock_data/enquiries.json")
+
+    def get_expenses(self):
+        return self.load_json("mock_data/expenses.json")
+
+    def get_admissions(self):
+        return self.load_json("mock_data/admissions.json")
+
+    def get_students_by_class(self, class_name):
+        students = self.get_students()
+        return [
+            student
+            for student in students
+            if student["class_name"].lower() == class_name.lower()
+        ]
+
+    def get_fee_collections(self, date_range=None, class_name=None):
+        students = self.get_students()
+        fees_data = self.get_fees()
+        records = []
+
+        for student in students:
+            if class_name and student["class_name"].lower() != class_name.lower():
+                continue
+
+            fees = self.find_by_student_id(fees_data, student["student_id"])
+            if fees and fees["paid_fees"] > 0:
+                records.append({"student": student, "fees": fees})
+
+        return records
+
+    def get_students_with_outstanding_fees(self, class_name=None):
+        students = self.get_students()
+        fees_data = self.get_fees()
+        records = []
+
+        for student in students:
+            if class_name and student["class_name"].lower() != class_name.lower():
+                continue
+
+            fees = self.find_by_student_id(fees_data, student["student_id"])
+            if fees and fees["outstanding_fees"] > 0:
+                records.append({"student": student, "fees": fees})
+
+            return records

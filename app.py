@@ -6,6 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
+from core.permissions import is_allowed
 from agents.llm_parser import parse_user_message
 from agents.response_formatter import format_response
 from agents.tool_router import route_tool
@@ -104,6 +105,14 @@ def chat(request: ChatRequest):
 
     intent = parsed["intent"]
     parameters = sanitize_parameters(parsed["parameters"])
+
+    if not is_allowed(request.role, intent):
+     return {
+        "user_message": request.message,
+        "detected_intent": intent,
+        "parameters": parameters,
+        "reply": "You do not have permission to access this information."
+    }
 
     tool_result = route_tool(intent, parameters)
     formatted_response = format_response(tool_result)

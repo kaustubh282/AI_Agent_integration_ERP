@@ -1,3 +1,23 @@
+from datetime import datetime
+
+
+def format_date(value):
+    if not value:
+        return "N/A"
+
+    if value in (
+        "0001-01-01T00:00:00",
+        "0001-01-01",
+        "1900-01-01T00:00:00",
+    ):
+        return "N/A"
+
+    try:
+        return datetime.fromisoformat(value.replace("Z", "")).strftime("%d-%m-%Y")
+    except Exception:
+        return value
+
+
 def format_response(tool_result: dict) -> str:
     if tool_result["status"] != "success":
         return tool_result.get("message", "No data found.")
@@ -11,13 +31,13 @@ def format_response(tool_result: dict) -> str:
         return f"""
 Attendance Details
 
-Name : {student['name']}
-Class : {student['class_name']}
-Roll Number : {student['roll_number']}
+Name : {student.get('name')}
+Class : {student.get('class_name')}
+Roll Number : {student.get('roll_number', 'N/A')}
 
-Present Days : {attendance['present_days']}
-Absent Days : {attendance['absent_days']}
-Attendance Percentage : {attendance['attendance_percentage']}%
+Present Days : {attendance.get('present_days', 'N/A')}
+Absent Days : {attendance.get('absent_days', 'N/A')}
+Attendance Percentage : {attendance.get('attendance_percentage', 'N/A')}%
 """.strip()
 
     if response_type == "fees_outstanding":
@@ -29,12 +49,12 @@ Attendance Percentage : {attendance['attendance_percentage']}%
 
             lines.extend(
                 [
-                    f"Name : {student['name']}",
-                    f"Class : {student['class_name']}",
-                    f"Roll Number : {student['roll_number']}",
-                    f"Total Fees : ₹{fees['total_fees']}",
-                    f"Paid Fees : ₹{fees['paid_fees']}",
-                    f"Outstanding Fees : ₹{fees['outstanding_fees']}",
+                    f"Name : {student.get('name')}",
+                    f"Class : {student.get('class_name')}",
+                    f"Roll Number : {student.get('roll_number', 'N/A')}",
+                    f"Total Fees : ₹{fees.get('total_fees', 0)}",
+                    f"Paid Fees : ₹{fees.get('paid_fees', 0)}",
+                    f"Outstanding Fees : ₹{fees.get('outstanding_fees', 0)}",
                     "",
                 ]
             )
@@ -55,11 +75,24 @@ Attendance Percentage : {attendance['attendance_percentage']}%
             "Payments",
         ]
 
-        for record in data.get("records", []):
-            lines.extend(
-                [
-                    f"- {record.get('student_name', 'Unknown')} | Class {record.get('class_name')} | ₹{record.get('amount')} | {record.get('date')} | {record.get('mode')}"
-                ]
+        records = data.get("records", [])
+
+        records = sorted(
+            records,
+            key=lambda record: record.get("date") or "",
+            reverse=True,
+        )
+
+        for record in records[:10]:
+            lines.append(
+                f"- {record.get('student_name', 'Unknown')} | Class {record.get('class_name')} | ₹{record.get('amount')} | {format_date(record.get('date'))} | {record.get('payment_mode') or record.get('mode')}"
+            )
+
+        if len(records) > 10:
+            lines.append("")
+            lines.append(f"Showing latest 10 of {len(records)} payments.")
+            lines.append(
+                "Ask 'show all fees collection records' if you want the full list."
             )
 
         return "\n".join(lines).strip()
@@ -81,20 +114,35 @@ Attendance Percentage : {attendance['attendance_percentage']}%
         return "\n".join(lines).strip()
 
     if response_type == "enquiry_report":
-        lines = ["Enquiry Report", ""]
+        enquiries = tool_result.get("data", [])
 
-        for enquiry in tool_result["data"]:
+        enquiries = sorted(
+            enquiries,
+            key=lambda enquiry: enquiry.get("enquiry_date")
+            or enquiry.get("date")
+            or "",
+            reverse=True,
+        )
+
+        lines = [
+            "Enquiry Report",
+            "",
+            f"Total Enquiries : {len(enquiries)}",
+            "",
+            "Latest Enquiries",
+        ]
+
+        for enquiry in enquiries[:10]:
             lines.extend(
                 [
-                    f"Name : {enquiry.get('student_name')}",
-                    f"Class Interested : {enquiry.get('class_name')}",
-                    f"Parent : {enquiry.get('parent_name')}",
-                    f"Contact : {enquiry.get('contact_number')}",
-                    f"Date : {enquiry.get('date')}",
-                    f"Status : {enquiry.get('status')}",
-                    "",
+                    f"- {enquiry.get('student_name', 'Unknown')} | Class {enquiry.get('class_name', 'N/A')} | {enquiry.get('status', 'N/A')} | {format_date(enquiry.get('enquiry_date') or enquiry.get('date'))}",
                 ]
             )
+
+        if len(enquiries) > 10:
+            lines.append("")
+            lines.append(f"Showing latest 10 of {len(enquiries)} enquiries.")
+            lines.append("Ask 'show all enquiries' if you want the full list.")
 
         return "\n".join(lines).strip()
 
@@ -104,11 +152,11 @@ Attendance Percentage : {attendance['attendance_percentage']}%
         for admission in tool_result["data"]:
             lines.extend(
                 [
-                    f"Student Name : {admission.get('student_name')}",
+                    f"Student Name : {admission.get('student_name') or admission.get('name')}",
                     f"Class : {admission.get('class_name')}",
-                    f"Admission Date : {admission.get('admission_date')}",
-                    f"Parent : {admission.get('parent_name')}",
-                    f"Contact : {admission.get('contact_number')}",
+                    f"Admission Date : {format_date(admission.get('admission_date'))}",
+                    f"Parent : {admission.get('parent_name') or admission.get('father_name')}",
+                    f"Contact : {admission.get('contact_number') or admission.get('father_contact')}",
                     "",
                 ]
             )
@@ -122,13 +170,13 @@ Attendance Percentage : {attendance['attendance_percentage']}%
         return f"""
 Student Exam Report
 
-Name : {student['name']}
-Class : {student['class_name']}
-Roll Number : {student['roll_number']}
+Name : {student.get('name')}
+Class : {student.get('class_name')}
+Roll Number : {student.get('roll_number', 'N/A')}
 
-Exam : {exam.get('exam_name')}
-Percentage : {exam.get('percentage')}%
-Grade : {exam.get('grade')}
+Exam : {exam.get('exam_name', 'N/A')}
+Percentage : {exam.get('percentage', 'N/A')}%
+Grade : {exam.get('grade', 'N/A')}
 """.strip()
 
     if response_type == "class_exam_report":
@@ -140,11 +188,11 @@ Grade : {exam.get('grade')}
 
             lines.extend(
                 [
-                    f"Name : {student['name']}",
-                    f"Roll Number : {student['roll_number']}",
-                    f"Exam : {exam.get('exam_name')}",
-                    f"Percentage : {exam.get('percentage')}%",
-                    f"Grade : {exam.get('grade')}",
+                    f"Name : {student.get('name')}",
+                    f"Roll Number : {student.get('roll_number', 'N/A')}",
+                    f"Exam : {exam.get('exam_name', 'N/A')}",
+                    f"Percentage : {exam.get('percentage', 'N/A')}%",
+                    f"Grade : {exam.get('grade', 'N/A')}",
                     "",
                 ]
             )
@@ -157,14 +205,18 @@ Grade : {exam.get('grade')}
         if tool_result.get("student"):
             student = tool_result["student"]
             lines.extend(
-                [f"Student : {student['name']}", f"Class : {student['class_name']}", ""]
+                [
+                    f"Student : {student.get('name')}",
+                    f"Class : {student.get('class_name')}",
+                    "",
+                ]
             )
 
         for communication in tool_result["data"]:
             lines.extend(
                 [
-                    f"Notice : {communication.get('last_notice')}",
-                    f"Homework : {communication.get('last_homework')}",
+                    f"Notice : {communication.get('last_notice', 'N/A')}",
+                    f"Homework : {communication.get('last_homework', 'N/A')}",
                     "",
                 ]
             )
@@ -173,44 +225,47 @@ Grade : {exam.get('grade')}
 
     data = tool_result["data"]
 
-    student = data["basic_details"]
-    attendance = data["attendance"]
-    fees = data["fees"]
-    exams = data["exams"]
-    communication = data["communication"]
+    student = data.get("basic_details") or {}
+    attendance = data.get("attendance") or {}
+    fees = data.get("fees") or {}
+    exams = data.get("exams") or {}
+    communication = data.get("communication") or {}
 
     return f"""
 Student Portfolio
 
 Basic Details
-Student ID : {student['student_id']}
-Name : {student['name']}
-Class : {student['class_name']}
-Roll Number : {student['roll_number']}
-Admission No : {student['admission_number']}
-Date of Birth : {student['dob']}
-Gender : {student['gender']}
-Parent : {student['parent_name']}
-Contact : {student['contact_number']}
-Address : {student['address']}
-Admission Date : {student['admission_date']}
+Student ID : {student.get('student_id')}
+Name : {student.get('name')}
+Class : {student.get('class_name')}
+Section : {student.get('section', 'N/A')}
+Roll Number : {student.get('roll_number') or 'N/A'}
+Admission No : {student.get('admission_number', 'N/A')}
+Date of Birth : {format_date(student.get('dob'))}
+Gender : {student.get('gender') or 'N/A'}
+Parent : {student.get('parent_name') or student.get('father_name') or student.get('mother_name') or 'N/A'}
+Father : {student.get('father_name', 'N/A')}
+Mother : {student.get('mother_name', 'N/A')}
+Contact : {student.get('contact_number') or student.get('father_contact') or student.get('mother_contact') or student.get('phone') or 'N/A'}
+Address : {student.get('address') or 'N/A'}
+Admission Date : {format_date(student.get('admission_date'))}
 
 Attendance
-Present Days : {attendance['present_days']}
-Absent Days : {attendance['absent_days']}
-Attendance Percentage : {attendance['attendance_percentage']}%
+Present Days : {attendance.get('present_days', 'N/A')}
+Absent Days : {attendance.get('absent_days', 'N/A')}
+Attendance Percentage : {attendance.get('attendance_percentage', 'N/A')}%
 
 Fees
-Total Fees : ₹{fees['total_fees']}
-Paid Fees : ₹{fees['paid_fees']}
-Outstanding Fees : ₹{fees['outstanding_fees']}
+Total Fees : ₹{fees.get('total_fees', 0)}
+Paid Fees : ₹{fees.get('paid_fees', 0)}
+Outstanding Fees : ₹{fees.get('outstanding_fees', 0)}
 
 Exam Report
-Exam Name : {exams['exam_name']}
-Percentage : {exams['percentage']}%
-Grade : {exams['grade']}
+Exam Name : {exams.get('exam_name', 'N/A')}
+Percentage : {exams.get('percentage', 'N/A')}%
+Grade : {exams.get('grade', 'N/A')}
 
 Communication
-Last Notice : {communication['last_notice']}
-Last Homework : {communication['last_homework']}
+Last Notice : {communication.get('last_notice', 'N/A')}
+Last Homework : {communication.get('last_homework', 'N/A')}
 """.strip()

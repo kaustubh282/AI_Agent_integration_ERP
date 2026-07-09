@@ -7,6 +7,7 @@ from core.exceptions import ERPValidationError
 
 MAX_MESSAGE_LENGTH = 2000
 MAX_NAME_LENGTH = 100
+
 ALLOWED_DATE_RANGES = {
     "today",
     "yesterday",
@@ -14,7 +15,14 @@ ALLOWED_DATE_RANGES = {
     "last_month",
     "this_month",
 }
-CLASS_NAME_PATTERN = re.compile(r"^\d{1,2}[A-Za-z]?$")
+
+# Flexible ERP class format:
+# 8, 8A, 8-A, JRKG, JRKG-A, SRKG-A, Nursery-A, I-A, II-B, X
+CLASS_NAME_PATTERN = re.compile(
+    r"^(NURSERY|JRKG|SRKG|I|II|III|IV|V|VI|VII|VIII|IX|X|\d{1,2})(-[A-Z])?$",
+    re.IGNORECASE,
+)
+
 STUDENT_NAME_PATTERN = re.compile(r"^[\w\s.\-'()]+$", re.UNICODE)
 CONTROL_CHAR_PATTERN = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
@@ -36,19 +44,30 @@ def sanitize_message(message: str) -> str:
     return cleaned
 
 
+def normalize_class_name(class_name: str) -> str:
+    class_name = CONTROL_CHAR_PATTERN.sub("", str(class_name)).strip().upper()
+    class_name = class_name.replace("_", "-")
+    class_name = re.sub(r"\s+", "-", class_name)
+
+    return class_name
+
+
 def sanitize_parameters(parameters: dict) -> dict:
     sanitized = dict(parameters)
 
     class_name = sanitized.get("class_name")
     if class_name is not None:
-        class_name = str(class_name).strip().upper()
+        class_name = normalize_class_name(class_name)
+
         if not CLASS_NAME_PATTERN.match(class_name):
             raise ERPValidationError("Invalid class name format.")
+
         sanitized["class_name"] = class_name
 
     student_name = sanitized.get("student_name")
     if student_name is not None:
         student_name = CONTROL_CHAR_PATTERN.sub("", str(student_name)).strip()
+
         if not student_name:
             sanitized["student_name"] = None
         elif len(student_name) > MAX_NAME_LENGTH:

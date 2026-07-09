@@ -12,12 +12,21 @@ from agents.response_formatter import format_response
 from agents.tool_router import route_tool
 from core.exceptions import ERPAgentError, ERPAPIError, ERPValidationError
 from core.security import sanitize_message, sanitize_parameters, verify_api_key
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="ERP AI Agent")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Local testing
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class ChatRequest(BaseModel):
@@ -107,12 +116,12 @@ def chat(request: ChatRequest):
     parameters = sanitize_parameters(parsed["parameters"])
 
     if not is_allowed(request.role, intent):
-     return {
-        "user_message": request.message,
-        "detected_intent": intent,
-        "parameters": parameters,
-        "reply": "You do not have permission to access this information."
-    }
+        return {
+            "user_message": request.message,
+            "detected_intent": intent,
+            "parameters": parameters,
+            "reply": "You do not have permission to access this information.",
+        }
 
     tool_result = route_tool(intent, parameters)
     formatted_response = format_response(tool_result)

@@ -63,23 +63,16 @@ Intent Rules:
 9. If the user asks for admissions, newly admitted students or admission report
 → new_admission
 
-10. If the user asks about:
-- homework
-- homework details
-- notice
-- notices
-- circular
-- announcement
-- announcements
-- communication
-- diary
-- parent message
-- teacher message
-- school message
-- latest notice
-- latest homework
-
+10. If the user asks about homework, notices, circulars, announcements, communication, diary, parent message, teacher message, school message, latest notice, or latest homework
 → daily_communication
+
+Parameter Rules:
+
+- student_name: Extract student name if user mentions one.
+- class_name: Extract class if user mentions one.
+- date_range: Use one of: today, yesterday, last_week, last_month, this_month. Otherwise null.
+- exam_name: Extract exam name if mentioned.
+- show_all: true if the user asks for all records, full report, complete report, full list, complete list, show all, all payments, all enquiries, or all collection records. Otherwise false.
 
 If you are not confident, return:
 
@@ -89,7 +82,8 @@ If you are not confident, return:
     "student_name": null,
     "class_name": null,
     "date_range": null,
-    "exam_name": null
+    "exam_name": null,
+    "show_all": false
   }
 }
 
@@ -101,7 +95,8 @@ Always return JSON in this exact format:
     "student_name": "...",
     "class_name": "...",
     "date_range": "...",
-    "exam_name": "..."
+    "exam_name": "...",
+    "show_all": true
   }
 }
 """
@@ -118,7 +113,19 @@ Always return JSON in this exact format:
     content = response.choices[0].message.content.strip()
 
     try:
-        return json.loads(content)
+        parsed = json.loads(content)
+
+        if "parameters" not in parsed:
+            parsed["parameters"] = {}
+
+        parsed["parameters"].setdefault("student_name", None)
+        parsed["parameters"].setdefault("class_name", None)
+        parsed["parameters"].setdefault("date_range", None)
+        parsed["parameters"].setdefault("exam_name", None)
+        parsed["parameters"].setdefault("show_all", False)
+
+        return parsed
+
     except json.JSONDecodeError:
         return {
             "intent": "unknown",
@@ -127,5 +134,6 @@ Always return JSON in this exact format:
                 "class_name": None,
                 "date_range": None,
                 "exam_name": None,
+                "show_all": False,
             },
         }

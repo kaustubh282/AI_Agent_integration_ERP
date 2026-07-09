@@ -85,6 +85,9 @@ def sanitize_parameters(parameters: dict) -> dict:
     if exam_name is not None:
         sanitized["exam_name"] = CONTROL_CHAR_PATTERN.sub("", str(exam_name)).strip()
 
+    show_all = sanitized.get("show_all")
+    sanitized["show_all"] = bool(show_all)
+
     return sanitized
 
 

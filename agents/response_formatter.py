@@ -83,12 +83,15 @@ Attendance Percentage : {attendance.get('attendance_percentage', 'N/A')}%
             reverse=True,
         )
 
-        for record in records[:10]:
+        show_all = tool_result.get("show_all") or data.get("show_all")
+        display_records = records if show_all else records[:10]
+        
+        for record in display_records:
             lines.append(
                 f"- {record.get('student_name', 'Unknown')} | Class {record.get('class_name')} | ₹{record.get('amount')} | {format_date(record.get('date'))} | {record.get('payment_mode') or record.get('mode')}"
             )
 
-        if len(records) > 10:
+        if not show_all and len(records) > 10:
             lines.append("")
             lines.append(f"Showing latest 10 of {len(records)} payments.")
             lines.append(

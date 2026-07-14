@@ -11,9 +11,22 @@ MAX_NAME_LENGTH = 100
 ALLOWED_DATE_RANGES = {
     "today",
     "yesterday",
+    "this_week",
     "last_week",
-    "last_month",
     "this_month",
+    "last_month",
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
 }
 
 # Flexible ERP class format:

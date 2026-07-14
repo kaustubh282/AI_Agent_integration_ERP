@@ -70,24 +70,31 @@ Parameter Rules:
 
 - student_name: Extract student name if user mentions one.
 - class_name: Extract class if user mentions one.
-- date_range: Use one of: today, yesterday, last_week, last_month, this_month. Otherwise null.
+- - date_range:
+  Use one of:
+  today,
+  yesterday,
+  last_week,
+  this_week,
+  last_month,
+  this_month,
+  january,
+  february,
+  march,
+  april,
+  may,
+  june,
+  july,
+  august,
+  september,
+  october,
+  november,
+  december.
+  Otherwise null.
 - exam_name: Extract exam name if mentioned.
-- show_all: true if the user asks for all records, full report, complete report, full list, complete list, show all, all payments, all enquiries, or all collection records. Otherwise false.
+- show_all: true if the user asks for all records, full report, complete report, full list, complete list, show all, all payments, all enquiries, all collection records, total records, or everything.
 
-If you are not confident, return:
-
-{
-  "intent": "unknown",
-  "parameters": {
-    "student_name": null,
-    "class_name": null,
-    "date_range": null,
-    "exam_name": null,
-    "show_all": false
-  }
-}
-
-Always return JSON in this exact format:
+Always return JSON in this format:
 
 {
   "intent": "...",
@@ -124,9 +131,59 @@ Always return JSON in this exact format:
         parsed["parameters"].setdefault("exam_name", None)
         parsed["parameters"].setdefault("show_all", False)
 
+        # -------------------------------
+        # Deterministic show_all override
+        # -------------------------------
+        lower_message = message.lower().strip()
+
+        show_all_phrases = [
+            "show all enquiry",
+            "show all enquiries",
+            "all enquiry",
+            "all enquiries",
+            "complete enquiry report",
+            "full enquiry report",
+            "show all",
+            "show me all",
+            "give all",
+            "give me all",
+            "get all",
+            "view all",
+            "all records",
+            "all record",
+            "full report",
+            "complete report",
+            "full list",
+            "complete list",
+            "all payments",
+            "all enquiries",
+            "all collection records",
+            "show complete",
+            "everything",
+            "entire report",
+        ]
+
+        normal_limited_phrases = [
+            "show fees collection",
+            "fees collection",
+            "show collection report",
+            "collection report",
+            "show fees collected",
+            "fees collected",
+            "show payment report",
+            "payment report",
+        ]
+
+        if lower_message in normal_limited_phrases:
+            parsed["parameters"]["show_all"] = False
+        elif any(phrase in lower_message for phrase in show_all_phrases):
+            parsed["parameters"]["show_all"] = True
+        else:
+            parsed["parameters"]["show_all"] = False
+
         return parsed
 
-    except json.JSONDecodeError:
+    except Exception:
         return {
             "intent": "unknown",
             "parameters": {

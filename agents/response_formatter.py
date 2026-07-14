@@ -13,9 +13,31 @@ def format_date(value):
         return "N/A"
 
     try:
-        return datetime.fromisoformat(value.replace("Z", "")).strftime("%d-%m-%Y")
+        return datetime.fromisoformat(str(value).replace("Z", "")).strftime("%d-%m-%Y")
     except Exception:
         return value
+
+
+def is_show_all(tool_result: dict, nested_data: dict | None = None) -> bool:
+    raw_value = tool_result.get("show_all", False)
+
+    if raw_value is not True and isinstance(nested_data, dict):
+        raw_value = nested_data.get("show_all", False)
+
+    return raw_value is True
+
+
+def limited_records(records: list, show_all: bool, limit: int = 10) -> list:
+    return records if show_all else records[:limit]
+
+
+def add_limit_message(
+    lines: list, show_all: bool, total_count: int, label: str, show_all_text: str
+):
+    if not show_all and total_count > 10:
+        lines.append("")
+        lines.append(f"Showing latest 10 of {total_count} {label}.")
+        lines.append(show_all_text)
 
 
 def format_response(tool_result: dict) -> str:
@@ -41,11 +63,15 @@ Attendance Percentage : {attendance.get('attendance_percentage', 'N/A')}%
 """.strip()
 
     if response_type == "fees_outstanding":
+        records = tool_result.get("data", [])
+        show_all = is_show_all(tool_result)
+        display_records = limited_records(records, show_all)
+
         lines = ["Fees Outstanding Report", ""]
 
-        for record in tool_result["data"]:
-            student = record["student"]
-            fees = record["fees"]
+        for record in display_records:
+            student = record.get("student", {})
+            fees = record.get("fees", {})
 
             lines.extend(
                 [
@@ -59,22 +85,18 @@ Attendance Percentage : {attendance.get('attendance_percentage', 'N/A')}%
                 ]
             )
 
+        add_limit_message(
+            lines,
+            show_all,
+            len(records),
+            "students",
+            "Ask 'show all fees outstanding records' if you want the full list.",
+        )
+
         return "\n".join(lines).strip()
 
     if response_type == "fees_collection":
         data = tool_result["data"]
-
-        lines = [
-            "Fees Collection Report",
-            "",
-            f"Date Range : {data.get('date_range', 'all')}",
-            f"Class : {data.get('class_name') or 'All'}",
-            f"Total Collected : ₹{data.get('total_collected', 0)}",
-            f"Payment Count : {data.get('payment_count', 0)}",
-            "",
-            "Payments",
-        ]
-
         records = data.get("records", [])
 
         records = sorted(
@@ -83,36 +105,87 @@ Attendance Percentage : {attendance.get('attendance_percentage', 'N/A')}%
             reverse=True,
         )
 
-        show_all = tool_result.get("show_all") or data.get("show_all")
-        display_records = records if show_all else records[:10]
-        
+        show_all = is_show_all(tool_result, data)
+        display_records = limited_records(records, show_all)
+
+        date_labels = {
+            "today": "Today",
+            "yesterday": "Yesterday",
+            "this_week": "This Week",
+            "last_week": "Last Week",
+            "this_month": "This Month",
+            "last_month": "Last Month",
+            "all": "All Time",
+            None: "All Time",
+        }
+
+        raw_date_range = data.get("date_range")
+        date_label = date_labels.get(
+            raw_date_range, str(raw_date_range).replace("_", " ").title()
+        )
+
+        lines = [
+            "Fees Collection Report",
+            "",
+            f"Date Range : {date_label}",
+            f"Class : {data.get('class_name') or 'All'}",
+            f"Total Collected : ₹{data.get('total_collected', 0)}",
+            f"Payment Count : {data.get('payment_count', 0)}",
+            "",
+            "Payments",
+        ]
+
         for record in display_records:
             lines.append(
-                f"- {record.get('student_name', 'Unknown')} | Class {record.get('class_name')} | ₹{record.get('amount')} | {format_date(record.get('date'))} | {record.get('payment_mode') or record.get('mode')}"
+                f"- {record.get('student_name', 'Unknown')} | "
+                f"Class {record.get('class_name')} | "
+                f"₹{record.get('amount')} | "
+                f"{format_date(record.get('date'))} | "
+                f"{record.get('payment_mode') or record.get('mode')}"
             )
 
-        if not show_all and len(records) > 10:
-            lines.append("")
-            lines.append(f"Showing latest 10 of {len(records)} payments.")
-            lines.append(
-                "Ask 'show all fees collection records' if you want the full list."
-            )
+        add_limit_message(
+            lines,
+            show_all,
+            len(records),
+            "payments",
+            "Ask 'show all fees collection records' if you want the full list.",
+        )
 
         return "\n".join(lines).strip()
 
     if response_type == "expenses":
+        expenses = tool_result.get("data", [])
+
+        expenses = sorted(
+            expenses,
+            key=lambda expense: expense.get("date") or "",
+            reverse=True,
+        )
+
+        show_all = is_show_all(tool_result)
+        display_expenses = limited_records(expenses, show_all)
+
         lines = ["Expenses Report", ""]
 
-        for expense in tool_result["data"]:
+        for expense in display_expenses:
             lines.extend(
                 [
-                    f"Date : {expense.get('date')}",
+                    f"Date : {format_date(expense.get('date'))}",
                     f"Category : {expense.get('category')}",
                     f"Description : {expense.get('description')}",
                     f"Amount : ₹{expense.get('amount')}",
                     "",
                 ]
             )
+
+        add_limit_message(
+            lines,
+            show_all,
+            len(expenses),
+            "expenses",
+            "Ask 'show all expenses' if you want the full list.",
+        )
 
         return "\n".join(lines).strip()
 
@@ -127,32 +200,77 @@ Attendance Percentage : {attendance.get('attendance_percentage', 'N/A')}%
             reverse=True,
         )
 
+        show_all = is_show_all(tool_result)
+        display_enquiries = limited_records(enquiries, show_all)
+
         lines = [
             "Enquiry Report",
             "",
             f"Total Enquiries : {len(enquiries)}",
             "",
-            "Latest Enquiries",
+            "Enquiries",
         ]
 
-        for enquiry in enquiries[:10]:
-            lines.extend(
-                [
-                    f"- {enquiry.get('student_name', 'Unknown')} | Class {enquiry.get('class_name', 'N/A')} | {enquiry.get('status', 'N/A')} | {format_date(enquiry.get('enquiry_date') or enquiry.get('date'))}",
-                ]
+        for enquiry in display_enquiries:
+            lines.append(
+                f"- {enquiry.get('student_name', 'Unknown')} | "
+                f"Class {enquiry.get('class_name', 'N/A')} | "
+                f"{enquiry.get('status', 'N/A')} | "
+                f"{format_date(enquiry.get('enquiry_date') or enquiry.get('date'))}"
             )
 
-        if len(enquiries) > 10:
-            lines.append("")
-            lines.append(f"Showing latest 10 of {len(enquiries)} enquiries.")
-            lines.append("Ask 'show all enquiries' if you want the full list.")
+        add_limit_message(
+            lines,
+            show_all,
+            len(enquiries),
+            "enquiries",
+            "Ask 'show all enquiries' if you want the full list.",
+        )
 
         return "\n".join(lines).strip()
 
     if response_type == "new_admission":
-        lines = ["New Admissions Report", ""]
+        admissions = tool_result.get("data", [])
 
-        for admission in tool_result["data"]:
+        admissions = sorted(
+            admissions,
+            key=lambda admission: admission.get("admission_date") or "",
+            reverse=True,
+        )
+
+        show_all = is_show_all(tool_result)
+        display_admissions = limited_records(admissions, show_all)
+
+        filters = tool_result.get("filters", {})
+
+        date_labels = {
+            "today": "Today",
+            "yesterday": "Yesterday",
+            "this_week": "This Week",
+            "last_week": "Last Week",
+            "this_month": "This Month",
+            "last_month": "Last Month",
+            "all": "All Time",
+            None: "All Time",
+        }
+
+        raw_date_range = filters.get("date_range")
+        date_label = date_labels.get(
+            raw_date_range,
+            str(raw_date_range).replace("_", " ").title(),
+        )
+
+        lines = [
+            "New Admissions Report",
+            "",
+            f"Date Range : {date_label}",
+            f"Class : {filters.get('class_name', 'All')}",
+            f"Total Admissions : {len(admissions)}",
+            "",
+            "Admissions",
+        ]
+
+        for admission in display_admissions:
             lines.extend(
                 [
                     f"Student Name : {admission.get('student_name') or admission.get('name')}",
@@ -163,6 +281,14 @@ Attendance Percentage : {attendance.get('attendance_percentage', 'N/A')}%
                     "",
                 ]
             )
+
+        add_limit_message(
+            lines,
+            show_all,
+            len(admissions),
+            "admissions",
+            "Ask 'show all new admissions' if you want the full list.",
+        )
 
         return "\n".join(lines).strip()
 
@@ -183,11 +309,15 @@ Grade : {exam.get('grade', 'N/A')}
 """.strip()
 
     if response_type == "class_exam_report":
+        records = tool_result.get("data", [])
+        show_all = is_show_all(tool_result)
+        display_records = limited_records(records, show_all)
+
         lines = ["Class Exam Report", ""]
 
-        for record in tool_result["data"]:
-            student = record["student"]
-            exam = record["exam"]
+        for record in display_records:
+            student = record.get("student", {})
+            exam = record.get("exam", {})
 
             lines.extend(
                 [
@@ -200,9 +330,21 @@ Grade : {exam.get('grade', 'N/A')}
                 ]
             )
 
+        add_limit_message(
+            lines,
+            show_all,
+            len(records),
+            "students",
+            "Ask 'show all class exam records' if you want the full list.",
+        )
+
         return "\n".join(lines).strip()
 
     if response_type == "daily_communication":
+        communications = tool_result.get("data", [])
+        show_all = is_show_all(tool_result)
+        display_communications = limited_records(communications, show_all)
+
         lines = ["Daily Communication", ""]
 
         if tool_result.get("student"):
@@ -215,7 +357,7 @@ Grade : {exam.get('grade', 'N/A')}
                 ]
             )
 
-        for communication in tool_result["data"]:
+        for communication in display_communications:
             lines.extend(
                 [
                     f"Notice : {communication.get('last_notice', 'N/A')}",
@@ -223,6 +365,14 @@ Grade : {exam.get('grade', 'N/A')}
                     "",
                 ]
             )
+
+        add_limit_message(
+            lines,
+            show_all,
+            len(communications),
+            "communications",
+            "Ask 'show all daily communications' if you want the full list.",
+        )
 
         return "\n".join(lines).strip()
 

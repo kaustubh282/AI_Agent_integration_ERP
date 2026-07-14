@@ -115,6 +115,11 @@ def chat(request: ChatRequest):
     intent = parsed["intent"]
     parameters = sanitize_parameters(parsed["parameters"])
 
+    print("=" * 60)
+    print("PARSED INTENT:", intent)
+    print("PARSED PARAMETERS:", parameters)
+    print("=" * 60)
+
     if not is_allowed(request.role, intent):
         return {
             "user_message": request.message,

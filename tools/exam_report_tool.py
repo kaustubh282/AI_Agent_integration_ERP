@@ -6,13 +6,19 @@ def get_student_exam_report(parameters: dict) -> dict:
     student_name = parameters.get("student_name")
     class_name = parameters.get("class_name")
 
+    if not student_name:
+        return {
+            "status": "validation_error",
+            "message": "Please mention the student name for the exam report.",
+        }
+
     client = ERPAPIClient()
     student = client.find_student(student_name, class_name)
 
     if not student:
         return {
             "status": "not_found",
-            "message": "Student not found for exam report.",
+            "message": "Student not found for the given name and class.",
         }
 
     if settings.ERP_DATA_MODE == "api":
@@ -25,7 +31,10 @@ def get_student_exam_report(parameters: dict) -> dict:
             ),
         }
 
-    exam = client.find_by_student_id(client.get_exams(), student["student_id"])
+    exam = client.find_by_student_id(
+        client.get_exams(),
+        student["student_id"],
+    )
 
     if not exam:
         return {
@@ -43,6 +52,13 @@ def get_student_exam_report(parameters: dict) -> dict:
 
 def get_class_exam_report(parameters: dict) -> dict:
     class_name = parameters.get("class_name")
+    show_all = parameters.get("show_all", False)
+
+    if not class_name:
+        return {
+            "status": "validation_error",
+            "message": "Please mention the class name for the class exam report.",
+        }
 
     client = ERPAPIClient()
 
@@ -62,7 +78,11 @@ def get_class_exam_report(parameters: dict) -> dict:
     records = []
 
     for student in students:
-        exam = client.find_by_student_id(exams, student["student_id"])
+        exam = client.find_by_student_id(
+            exams,
+            student.get("student_id"),
+        )
+
         if exam:
             records.append(
                 {
@@ -74,11 +94,15 @@ def get_class_exam_report(parameters: dict) -> dict:
     if not records:
         return {
             "status": "not_found",
-            "message": "No class exam report found.",
+            "message": f"No class exam report found for class {class_name}.",
         }
 
     return {
         "status": "success",
         "type": "class_exam_report",
+        "show_all": show_all,
+        "filters": {
+            "class_name": class_name,
+        },
         "data": records,
     }

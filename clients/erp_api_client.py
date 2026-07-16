@@ -9,6 +9,7 @@ from config.settings import settings
 from core.exceptions import ERPAPIError
 
 import calendar
+from difflib import SequenceMatcher
 
 MOCK_DATA_DIR = Path("mock_data")
 
@@ -117,10 +118,15 @@ class ERPAPIClient:
     # Real ERP API methods found
     # -----------------------------
 
-    def get_students_by_board_year(self):
-        return self.get_api(
-            f"GetStudentListByBoardYear/{self.tenant_board_id}/{self.academic_year_id}"
+    def get_students_by_board_year(self):     
+
+        endpoint = (
+            f"GetStudentListByBoardYear/"
+            f"{self.tenant_board_id}/"
+            f"{self.academic_year_id}"
         )
+
+        return self.get_api(endpoint)
 
     def get_students_by_grade(self, tenant_class_id: int):
         return self.get_api(
@@ -168,19 +174,16 @@ class ERPAPIClient:
 
     def get_students(self):
         if settings.ERP_DATA_MODE == "api":
-            all_students = []
+            students = self.get_students_by_board_year()
 
-            for class_id in range(1, 13):
-                students = self.get_students_by_grade(class_id)
+            if not isinstance(students, list):
+                return []
 
-                if isinstance(students, list):
-                    all_students.extend(students)
-
-            return [
-                self.normalize_student(student)
-                for student in all_students
-                if (student.get("nameDisplayLabel") or "").strip()
+            normalized_students = [
+                self.normalize_student(student) for student in students
             ]
+
+            return [student for student in normalized_students if student.get("name")]
 
         return self.load_json("students.json")
 
@@ -254,71 +257,107 @@ class ERPAPIClient:
         return self.load_json("expenses.json")
 
     def get_admissions(self, date_range=None, class_name=None):
-        if settings.ERP_DATA_MODE == "api":
-         students = self.get_students()
 
-         records = [
-            {
-                "student_name": student.get("name"),
-                "class_name": student.get("display_label")
-                or student.get("class_name"),
-                "admission_date": student.get("admission_date"),
-                "parent_name": student.get("father_name")
-                or student.get("mother_name"),
-                "contact_number": student.get("father_contact")
-                or student.get("mother_contact")
-                or student.get("phone"),
-                "raw": student,
-            }
-            for student in students
-        ]
+        print("ADMISSION FILTERS:", date_range, class_name)
+
+        if settings.ERP_DATA_MODE == "api":
+            students = self.get_students()
+
+            records = [
+                {
+                    "student_name": student.get("name"),
+                    "class_name": student.get("display_label")
+                    or student.get("class_name"),
+                    "admission_date": student.get("admission_date"),
+                    "parent_name": student.get("father_name")
+                    or student.get("mother_name"),
+                    "contact_number": student.get("father_contact")
+                    or student.get("mother_contact")
+                    or student.get("phone"),
+                    "raw": student,
+                }
+                for student in students
+            ]
         else:
-         records = self.load_json("admissions.json")
+            records = self.load_json("admissions.json")
+
+        print("TOTAL ADMISSION RECORDS BEFORE FILTER:", len(records))
 
         if class_name:
-         requested_class = class_name.lower().strip()
+            requested_class = class_name.lower().strip()
 
-        records = [
-            record
-            for record in records
-            if requested_class
-            in (record.get("class_name") or "").lower()
-        ]
+            records = [
+                record
+                for record in records
+                if requested_class in (record.get("class_name") or "").lower()
+            ]
 
         if date_range:
-         records = [
-            record
-            for record in records
-            if self._matches_date_range(
-                record.get("admission_date"),
-                date_range,
-            )
-        ]
+            records = [
+                record
+                for record in records
+                if self._matches_date_range(
+                    record.get("admission_date"),
+                    date_range,
+                )
+            ]
 
-         return records
+        return records
 
     def find_student(self, student_name, class_name=None):
         if not student_name:
             return None
 
-        student_name = student_name.lower().strip()
-        class_name = class_name.lower().strip() if class_name else None
-
-        for student in self.get_students():
-            current_name = student.get("name", "").lower().strip()
-            current_class = student.get("class_name", "").lower().strip()
-            current_display_label = student.get("display_label", "").lower().strip()
-
-            name_matches = current_name == student_name
-
-            class_matches = (
-                not class_name
-                or current_class == class_name
-                or current_display_label == class_name
+        def normalize(value):
+            return " ".join(
+                str(value or "").lower().replace("-", " ").replace(".", " ").split()
             )
 
-            if name_matches and class_matches:
+        requested_name = normalize(student_name)
+        requested_class = normalize(class_name) if class_name else None
+
+        best_match = None
+        best_score = 0.0
+
+        for student in self.get_students():
+
+            current_name = normalize(student.get("name"))
+            current_class = normalize(student.get("class_name"))
+            display_label = normalize(student.get("display_label"))
+
+            class_matches = (
+                not requested_class
+                or requested_class == current_class
+                or requested_class == display_label
+                or requested_class in current_class
+                or requested_class in display_label
+            )
+
+            if not class_matches:
+                continue
+
+            # Exact or partial match
+            if (
+                requested_name == current_name
+                or requested_name in current_name
+                or current_name in requested_name
+            ):
                 return student
+
+            # Fuzzy spelling match
+            score = SequenceMatcher(
+                None,
+                requested_name,
+                current_name,
+            ).ratio()
+
+            if score > best_score:
+                best_score = score
+                best_match = student
+
+        # Avoid returning a completely unrelated student
+        if best_score >= 0.75:
+            return best_match
 
         return None
 
@@ -598,7 +637,19 @@ class ERPAPIClient:
     def normalize_student(self, student: dict):
         return {
             "student_id": student.get("studentId") or student.get("id"),
-            "name": (student.get("nameDisplayLabel") or "").strip(),
+            "name": (
+                student.get("nameDisplayLabel")
+                or " ".join(
+                    filter(
+                        None,
+                        [
+                            student.get("firstName"),
+                            student.get("middleName"),
+                            student.get("lastName"),
+                        ],
+                    )
+                )
+            ).strip(),
             "admission_number": student.get("prn")
             or student.get("saralID")
             or student.get("studentId"),
@@ -616,6 +667,7 @@ class ERPAPIClient:
             "academic_year_name": student.get("academicYearName"),
             "board_name": student.get("boardName"),
             "gender": student.get("gender"),
+            "admission_date": student.get("admissionDate"),
             "dob": student.get("dob"),
             "father_name": student.get("fatherName"),
             "father_contact": student.get("fatherContact1"),

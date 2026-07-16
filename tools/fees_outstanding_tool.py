@@ -4,6 +4,7 @@ from config.settings import settings
 
 def get_fees_outstanding(parameters: dict) -> dict:
     class_name = parameters.get("class_name")
+    show_all = parameters.get("show_all", False)
 
     client = ERPAPIClient()
 
@@ -23,6 +24,10 @@ def get_fees_outstanding(parameters: dict) -> dict:
         return {
             "status": "success",
             "type": "fees_outstanding",
+            "show_all": show_all,
+            "filters": {
+                "class_name": class_name or "All",
+            },
             "data": records,
         }
 
@@ -37,5 +42,9 @@ def get_fees_outstanding(parameters: dict) -> dict:
     return {
         "status": "success",
         "type": "fees_outstanding",
+        "show_all": show_all,
+        "filters": {
+            "class_name": class_name or "All",
+        },
         "data": records,
     }

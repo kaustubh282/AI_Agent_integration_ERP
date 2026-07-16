@@ -6,13 +6,23 @@ def get_attendance_details(parameters: dict) -> dict:
     student_name = parameters.get("student_name")
     class_name = parameters.get("class_name")
 
+    if not student_name:
+        return {
+            "status": "validation_error",
+            "message": "Please mention the student name for attendance details.",
+        }
+
     client = ERPAPIClient()
-    selected_student = client.find_student(student_name, class_name)
+
+    selected_student = client.find_student(
+        student_name,
+        class_name,
+    )
 
     if not selected_student:
         return {
             "status": "not_found",
-            "message": "Student not found for attendance details.",
+            "message": "Student not found for the given name and class.",
         }
 
     if settings.ERP_DATA_MODE == "api":
@@ -25,7 +35,8 @@ def get_attendance_details(parameters: dict) -> dict:
         }
 
     attendance = client.find_by_student_id(
-        client.get_attendance(), selected_student["student_id"]
+        client.get_attendance(),
+        selected_student["student_id"],
     )
 
     if not attendance:
